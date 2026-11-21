@@ -8,3 +8,6 @@ GetModuleFileNameW
 GetCommandLineW
 GetTickCount64
 GetCurrentProcessId
+LoadLibraryExW
+GetProcAddress
+SetDefaultDllDirectories

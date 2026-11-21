@@ -79,6 +79,38 @@ static UINT  g_mods, g_vk, g_scan;   /* current shortcut */
 static int   g_hkOk;                 /* shortcut registered? */
 static WCHAR g_hkText[96];
 
+/* optional system DLLs, loaded from System32 only */
+static PFN_DwmGetWindowAttribute pDwmGetWindowAttribute;
+static PFN_DwmSetWindowAttribute pDwmSetWindowAttribute;
+static PFN_GetDpiForMonitor      pGetDpiForMonitor;
+
+static void load_system_dlls(void)
+{
+    SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32);
+    HMODULE dwm = LoadLibraryExW(L"dwmapi.dll", 0, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (dwm) {
+        pDwmGetWindowAttribute = (PFN_DwmGetWindowAttribute)GetProcAddress(dwm, "DwmGetWindowAttribute");
+        pDwmSetWindowAttribute = (PFN_DwmSetWindowAttribute)GetProcAddress(dwm, "DwmSetWindowAttribute");
+    }
+    HMODULE shc = LoadLibraryExW(L"shcore.dll", 0, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (shc) pGetDpiForMonitor = (PFN_GetDpiForMonitor)GetProcAddress(shc, "GetDpiForMonitor");
+}
+
+static HRESULT DwmGetWindowAttribute(HWND h, DWORD a, void *v, DWORD n)
+{
+    return pDwmGetWindowAttribute ? pDwmGetWindowAttribute(h, a, v, n) : (HRESULT)0x80004001L;
+}
+
+static HRESULT DwmSetWindowAttribute(HWND h, DWORD a, const void *v, DWORD n)
+{
+    return pDwmSetWindowAttribute ? pDwmSetWindowAttribute(h, a, v, n) : (HRESULT)0x80004001L;
+}
+
+static HRESULT GetDpiForMonitor(HMONITOR m, int t, UINT *x, UINT *y)
+{
+    return pGetDpiForMonitor ? pGetDpiForMonitor(m, t, x, y) : (HRESULT)0x80004001L;
+}
+
 static const WCHAR REG_APP[] = L"Software\\Epingle";
 static const WCHAR REG_RUN[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 static const WCHAR RUN_NAME[] = L"Epingle";
@@ -880,6 +912,7 @@ void WinMainCRTStartup(void)
         ExitProcess(0);
     }
 
+    load_system_dlls();
     rg_build_lut();
     g_icon = (HICON)LoadImageW(g_inst, MAKEINTRESOURCEW(1), IMAGE_ICON,
                                GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0);

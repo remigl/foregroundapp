@@ -22,7 +22,7 @@ Windows ne permet pas d'épingler une fenêtre d'un programme lancé *en adminis
 
 ## Confidentialité et permissions
 
-- **Aucun accès réseau.** Le programme n'importe aucune bibliothèque réseau. Pour le vérifier, la liste complète des fonctions Windows utilisées se trouve dans `src/win.h`. Vous pouvez aussi lancer `dumpbin /imports Epingle.exe` : vous n'y trouverez que kernel32, user32, gdi32, shell32, advapi32, dwmapi et shcore.
+- **Aucun accès réseau.** Le programme n'importe aucune bibliothèque réseau. Pour le vérifier, la liste complète des fonctions Windows utilisées se trouve dans `src/win.h`. Vous pouvez aussi lancer `dumpbin /imports Epingle.exe` : vous n'y trouverez que kernel32, user32, gdi32, shell32 et advapi32. `dwmapi` et `shcore` sont chargées à la demande, uniquement depuis System32, ce qui protège contre une DLL piégée placée à côté du .exe.
 - **Droits utilisateur standard** (`asInvoker`) : l'application ne demande jamais l'administrateur.
 - **Aucune injection** dans les autres programmes. La position des fenêtres est suivie avec un hook « hors contexte », actif seulement tant qu'une fenêtre est épinglée.
 - **Réglages** : `HKEY_CURRENT_USER\Software\Epingle` (le raccourci). L'option de démarrage écrit dans `HKCU\...\CurrentVersion\Run`. Rien d'autre n'est écrit sur le disque.

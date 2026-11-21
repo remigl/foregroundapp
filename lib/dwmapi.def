@@ -1,4 +1,0 @@
-LIBRARY dwmapi.dll
-EXPORTS
-DwmGetWindowAttribute
-DwmSetWindowAttribute

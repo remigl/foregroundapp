@@ -155,6 +155,9 @@ IMP DWORD     WINAPI GetModuleFileNameW(HMODULE, WCHAR *, DWORD);
 IMP WCHAR *   WINAPI GetCommandLineW(void);
 IMP ULONGLONG WINAPI GetTickCount64(void);
 IMP DWORD     WINAPI GetCurrentProcessId(void);
+IMP HMODULE   WINAPI LoadLibraryExW(const WCHAR *, HANDLE, DWORD);
+IMP void *    WINAPI GetProcAddress(HMODULE, const char *);
+IMP BOOL      WINAPI SetDefaultDllDirectories(DWORD);
 
 /* ---- user32 ---- */
 IMP ATOM    WINAPI RegisterClassExW(const WNDCLASSEXW *);
@@ -232,12 +235,13 @@ IMP LONG WINAPI RegSetValueExW(HKEY, const WCHAR *, DWORD, DWORD, const BYTE *, 
 IMP LONG WINAPI RegDeleteValueW(HKEY, const WCHAR *);
 IMP LONG WINAPI RegCloseKey(HKEY);
 
-/* ---- dwmapi ---- */
-IMP HRESULT WINAPI DwmGetWindowAttribute(HWND, DWORD, void *, DWORD);
-IMP HRESULT WINAPI DwmSetWindowAttribute(HWND, DWORD, const void *, DWORD);
-
-/* ---- shcore ---- */
-IMP HRESULT WINAPI GetDpiForMonitor(HMONITOR, int, UINT *, UINT *);
+/* ---- dwmapi / shcore: NOT imported. They are not "KnownDLLs", so a static
+ * import would make Windows look for them next to the .exe first (DLL
+ * planting). They are loaded at runtime from System32 only, see main.c. */
+typedef HRESULT (WINAPI *PFN_DwmGetWindowAttribute)(HWND, DWORD, void *, DWORD);
+typedef HRESULT (WINAPI *PFN_DwmSetWindowAttribute)(HWND, DWORD, const void *, DWORD);
+typedef HRESULT (WINAPI *PFN_GetDpiForMonitor)(HMONITOR, int, UINT *, UINT *);
+#define LOAD_LIBRARY_SEARCH_SYSTEM32 0x00000800
 
 /* ---- constants ---- */
 #define MAKEINTRESOURCEW(i) ((const WCHAR *)(ULONG_PTR)(WORD)(i))

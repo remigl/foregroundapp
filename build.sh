@@ -12,13 +12,13 @@ done
 (cd src && llvm-rc /nologo /C 65001 /fo ../build/app.res app.rc)
 
 clang -target x86_64-pc-windows-msvc -O2 -Wall -Wextra -Wno-unused-parameter \
-  -ffreestanding -fno-builtin -fno-stack-protector -mno-stack-arg-probe \
+  -ffreestanding -fno-builtin -funwind-tables -fno-stack-protector -mno-stack-arg-probe \
   -c src/main.c -o build/main.obj
 
 lld-link /nologo /subsystem:windows,10.0 /entry:WinMainCRTStartup /nodefaultlib \
   /opt:ref /opt:icf /dynamicbase /nxcompat /highentropyva /release \
   /out:build/Epingle.exe build/main.obj build/app.res \
   build/kernel32.lib build/user32.lib build/gdi32.lib build/shell32.lib \
-  build/advapi32.lib build/dwmapi.lib build/shcore.lib
+  build/advapi32.lib
 
 ls -l build/Epingle.exe
