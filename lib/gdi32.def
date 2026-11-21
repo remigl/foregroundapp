@@ -1,0 +1,11 @@
+LIBRARY gdi32.dll
+EXPORTS
+CreateCompatibleDC
+DeleteDC
+CreateDIBSection
+SelectObject
+DeleteObject
+CreateSolidBrush
+CreateFontW
+SetBkMode
+SetTextColor
