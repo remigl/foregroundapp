@@ -1,0 +1,54 @@
+name: Release
+
+# Builds Epingle.exe from source and attaches it to the GitHub release.
+#  - automatically when a tag v* is pushed (or created from the Releases page)
+#  - manually (Actions > Release > Run workflow) for an existing tag
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag de la release (ex. v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Install LLVM (clang, lld-link, llvm-rc, llvm-dlltool)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang lld llvm
+          echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
+
+      - name: Build Epingle.exe
+        run: ./build.sh
+
+      - name: Check the executable imports no network library
+        run: |
+          llvm-readobj --coff-imports build/Epingle.exe | grep 'Name:' | tee imports.txt
+          if grep -iqE 'ws2_32|wininet|winhttp|urlmon|wsock32|iphlpapi' imports.txt; then
+            echo "::error::network library imported"; exit 1
+          fi
+
+      - name: Publish to the release
+        run: |
+          cp .github/release-notes.md notes.md
+          printf '\nSHA-256 : `%s`\n' "$(sha256sum build/Epingle.exe | cut -d' ' -f1)" >> notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" build/Epingle.exe --clobber
+            gh release edit "$TAG" --title "Épingle ${TAG#v}" --notes-file notes.md
+          else
+            gh release create "$TAG" build/Epingle.exe --title "Épingle ${TAG#v}" --notes-file notes.md
+          fi

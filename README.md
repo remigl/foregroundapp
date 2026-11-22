@@ -44,3 +44,7 @@ Sous Windows, installez LLVM (`winget install LLVM.LLVM`) puis lancez le script 
 L'icône se régénère avec `python tools/make_icon.py src/app.ico` (nécessite Pillow).
 
 Windows 10 ou 11, 64 bits.
+
+## Publier une version
+
+Créez un tag `vX.Y.Z` (ou une release depuis la page Releases) : le workflow `.github/workflows/release.yml` compile `Epingle.exe` et l'attache automatiquement à la release.
