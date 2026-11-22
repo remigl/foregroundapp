@@ -22,11 +22,12 @@ Windows ne permet pas d'épingler une fenêtre d'un programme lancé *en adminis
 
 ## Confidentialité et permissions
 
-- **Aucun accès réseau.** Le programme n'importe aucune bibliothèque réseau. Pour le vérifier, la liste complète des fonctions Windows utilisées se trouve dans `src/win.h`. Vous pouvez aussi lancer `dumpbin /imports Epingle.exe` : vous n'y trouverez que kernel32, user32, gdi32, shell32 et advapi32. `dwmapi` et `shcore` sont chargées à la demande, uniquement depuis System32, ce qui protège contre une DLL piégée placée à côté du .exe.
+- **Aucun accès réseau.** Le programme n'importe aucune bibliothèque réseau, ce que vérifie la CI à chaque build. Pour le contrôler vous-même : `dumpbin /imports Epingle.exe` n'affiche que kernel32, user32, gdi32, shell32, advapi32, dwmapi et shcore.
+- **DLL système chargées uniquement depuis System32** (`/DEPENDENTLOADFLAG`) : une DLL piégée posée à côté de l'exe est ignorée.
 - **Droits utilisateur standard** (`asInvoker`) : l'application ne demande jamais l'administrateur.
 - **Aucune injection** dans les autres programmes. La position des fenêtres est suivie avec un hook « hors contexte », actif seulement tant qu'une fenêtre est épinglée.
 - **Réglages** : `HKEY_CURRENT_USER\Software\Epingle` (le raccourci). L'option de démarrage écrit dans `HKCU\...\CurrentVersion\Run`. Rien d'autre n'est écrit sur le disque.
-- **Légèreté** : un exécutable de 60 Ko, sans runtime C ni dépendance. Sans fenêtre épinglée, l'app ne consomme aucun CPU. Dès qu'une fenêtre est épinglée, l'animation tourne à environ 30 images/s.
+- **Légèreté** : un seul .exe, sans dépendance. Sans fenêtre épinglée, l'app ne consomme aucun CPU. Dès qu'une fenêtre est épinglée, l'animation tourne à environ 30 images/s.
 
 ## Désinstaller
 
@@ -34,13 +35,15 @@ Quittez l'app, décochez « Lancer au démarrage » si besoin, puis supprimez l'
 
 ## Compiler
 
-Seul LLVM est nécessaire (clang, lld-link, llvm-rc, llvm-dlltool). Ni Visual Studio ni le SDK Windows ne sont requis :
+Le projet se compile avec MSVC (Visual Studio 2022, charge de travail « Développement Desktop en C++ »). Ouvrez *x64 Native Tools Command Prompt for VS 2022* puis lancez :
 
-```sh
-./build.sh          # produit build/Epingle.exe
+```bat
+build.bat
 ```
 
-Sous Windows, installez LLVM (`winget install LLVM.LLVM`) puis lancez le script depuis Git Bash.
+L'exe est généré dans `build\Epingle.exe`, avec le runtime C lié statiquement et les protections habituelles (ASLR, DEP, Control Flow Guard, CET).
+Chaque push sur `main` est aussi compilé par GitHub Actions : l'exe se télécharge dans les *artifacts* du run.
+
 L'icône se régénère avec `python tools/make_icon.py src/app.ico` (nécessite Pillow).
 
 Windows 10 ou 11, 64 bits.

@@ -3,28 +3,25 @@
  *
  *   - Default shortcut: Alt + ² (the key under Échap), configurable.
  *   - A pinned window is surrounded by an animated blue/green glow.
- *   - No network code, no C runtime, no admin rights, settings in HKCU only.
+ *   - No network code, no admin rights, settings in HKCU only.
+ *
+ * Built with MSVC and the Windows SDK (see build.bat).
  */
-#include "win.h"
+#define WIN32_LEAN_AND_MEAN
+#define UNICODE
+#define _UNICODE
+#define WINVER       0x0A00
+#define _WIN32_WINNT 0x0A00
+#include <windows.h>
+#include <shellapi.h>
+#include <dwmapi.h>
+#include <shellscalingapi.h>
+#include <string.h>
 #include "render.h"
 
-/* ------------------------------------------------------------------ */
-/* No C runtime: the compiler may still emit calls to these two.       */
-int _fltused = 0;
-
-void *memset(void *dst, int c, SIZE_T n)
-{
-    void *ret = dst;
-    __asm__ volatile("rep stosb" : "+D"(dst), "+c"(n) : "a"(c) : "memory");
-    return ret;
-}
-
-void *memcpy(void *dst, const void *src, SIZE_T n)
-{
-    void *ret = dst;
-    __asm__ volatile("rep movsb" : "+D"(dst), "+S"(src), "+c"(n) : : "memory");
-    return ret;
-}
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
 
 /* ------------------------------------------------------------------ */
 #define APP_NAME      L"Épingle"
@@ -78,38 +75,6 @@ static int           g_trayOk;
 static UINT  g_mods, g_vk, g_scan;   /* current shortcut */
 static int   g_hkOk;                 /* shortcut registered? */
 static WCHAR g_hkText[96];
-
-/* optional system DLLs, loaded from System32 only */
-static PFN_DwmGetWindowAttribute pDwmGetWindowAttribute;
-static PFN_DwmSetWindowAttribute pDwmSetWindowAttribute;
-static PFN_GetDpiForMonitor      pGetDpiForMonitor;
-
-static void load_system_dlls(void)
-{
-    SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32);
-    HMODULE dwm = LoadLibraryExW(L"dwmapi.dll", 0, LOAD_LIBRARY_SEARCH_SYSTEM32);
-    if (dwm) {
-        pDwmGetWindowAttribute = (PFN_DwmGetWindowAttribute)GetProcAddress(dwm, "DwmGetWindowAttribute");
-        pDwmSetWindowAttribute = (PFN_DwmSetWindowAttribute)GetProcAddress(dwm, "DwmSetWindowAttribute");
-    }
-    HMODULE shc = LoadLibraryExW(L"shcore.dll", 0, LOAD_LIBRARY_SEARCH_SYSTEM32);
-    if (shc) pGetDpiForMonitor = (PFN_GetDpiForMonitor)GetProcAddress(shc, "GetDpiForMonitor");
-}
-
-static HRESULT DwmGetWindowAttribute(HWND h, DWORD a, void *v, DWORD n)
-{
-    return pDwmGetWindowAttribute ? pDwmGetWindowAttribute(h, a, v, n) : (HRESULT)0x80004001L;
-}
-
-static HRESULT DwmSetWindowAttribute(HWND h, DWORD a, const void *v, DWORD n)
-{
-    return pDwmSetWindowAttribute ? pDwmSetWindowAttribute(h, a, v, n) : (HRESULT)0x80004001L;
-}
-
-static HRESULT GetDpiForMonitor(HMONITOR m, int t, UINT *x, UINT *y)
-{
-    return pGetDpiForMonitor ? pGetDpiForMonitor(m, t, x, y) : (HRESULT)0x80004001L;
-}
 
 static const WCHAR REG_APP[] = L"Software\\Epingle";
 static const WCHAR REG_RUN[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
@@ -744,7 +709,7 @@ static void cap_paint(HWND h)
         DeleteObject(br);
     }
 
-    SetBkMode(dc, BK_TRANSPARENT);
+    SetBkMode(dc, TRANSPARENT);
     int L = scale(28, d), R = rc.right - scale(28, d);
 
     RECT r1 = { L, scale(18, d), R, scale(48, d) };
@@ -900,19 +865,19 @@ static void register_class(const WCHAR *name, WNDPROC proc)
     RegisterClassExW(&wc);
 }
 
-void WinMainCRTStartup(void)
+int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR cmdLine, int nShow)
 {
     MSG msg;
-    g_inst = GetModuleHandleW(0);
+    (void)hPrev; (void)nShow;
+    g_inst = hInst;
 
     CreateMutexW(0, 0, L"Local\\Epingle.SingleInstance");
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
         MessageBoxW(0, L"Épingle est déjà lancé.\n\nSon icône se trouve dans la zone de notification, près de l'horloge.",
                     APP_NAME, MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
-        ExitProcess(0);
+        return 0;
     }
 
-    load_system_dlls();
     rg_build_lut();
     g_icon = (HICON)LoadImageW(g_inst, MAKEINTRESOURCEW(1), IMAGE_ICON,
                                GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0);
@@ -922,7 +887,7 @@ void WinMainCRTStartup(void)
 
     g_main = CreateWindowExW(WS_EX_TOOLWINDOW, L"EpingleMain", APP_NAME, WS_POPUP,
                              0, 0, 0, 0, 0, 0, g_inst, 0);
-    if (!g_main) ExitProcess(1);
+    if (!g_main) return 1;
     g_memdc = CreateCompatibleDC(0);
     g_msgTaskbar = RegisterWindowMessageW(L"TaskbarCreated");
 
@@ -931,9 +896,7 @@ void WinMainCRTStartup(void)
     g_hkOk = shortcut_register(g_mods, g_vk);
     tray_add();
 
-    if (startup_enabled()) startup_set(1);   /* keep the path right if the exe moved */
-
-    int silent = wcontains(GetCommandLineW(), L"--startup");
+    int silent = cmdLine && wcontains(cmdLine, L"--startup");
     WCHAR msgText[256];
     if (!g_hkOk) {
         wcopy(msgText, g_hkText, 256);
@@ -951,5 +914,5 @@ void WinMainCRTStartup(void)
         DispatchMessageW(&msg);
     }
     if (g_memdc) DeleteDC(g_memdc);
-    ExitProcess((UINT)msg.wParam);
+    return (int)msg.wParam;
 }

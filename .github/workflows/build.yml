@@ -1,0 +1,38 @@
+name: Build
+
+# Compiles Epingle.exe on every push and pull request (download it from the run's artifacts).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build
+        shell: cmd
+        run: build.bat
+
+      - name: Check imports (no network library)
+        shell: bash
+        run: |
+          dumpbin //nologo //imports build/Epingle.exe | grep -i '\.dll' | tee imports.txt
+          if grep -iqE 'ws2_32|wininet|winhttp|urlmon|wsock32|iphlpapi|winsock' imports.txt; then
+            echo "::error::network library imported"; exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Epingle
+          path: build/Epingle.exe

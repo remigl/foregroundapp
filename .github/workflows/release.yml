@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-24.04
+    runs-on: windows-2025
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
       GH_TOKEN: ${{ github.token }}
@@ -26,29 +26,30 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - name: Install LLVM (clang, lld-link, llvm-rc, llvm-dlltool)
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq clang lld llvm
-          echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
-      - name: Build Epingle.exe
-        run: ./build.sh
+      - name: Build Epingle.exe (MSVC)
+        shell: cmd
+        run: build.bat
 
-      - name: Check the executable imports no network library
+      - name: Check imports (no network library)
+        shell: bash
         run: |
-          llvm-readobj --coff-imports build/Epingle.exe | grep 'Name:' | tee imports.txt
-          if grep -iqE 'ws2_32|wininet|winhttp|urlmon|wsock32|iphlpapi' imports.txt; then
+          dumpbin //nologo //imports build/Epingle.exe | grep -i '\.dll' | tee imports.txt
+          if grep -iqE 'ws2_32|wininet|winhttp|urlmon|wsock32|iphlpapi|winsock' imports.txt; then
             echo "::error::network library imported"; exit 1
           fi
 
       - name: Publish to the release
+        shell: bash
         run: |
           cat > notes.md <<'NOTES'
           **Épingle** garde une fenêtre au premier plan avec un raccourci clavier.
 
           ### Utilisation
-          1. Téléchargez `Epingle.exe` ci-dessous (environ 60 Ko, aucune installation).
+          1. Téléchargez `Epingle.exe` ci-dessous (aucune installation).
           2. Lancez-le. Une icône apparaît près de l'horloge.
           3. **Alt + ²** épingle la fenêtre active. Une lueur bleu/vert animée l'entoure. Refaites-le pour la libérer.
           4. Clic sur l'icône pour modifier le raccourci, libérer toutes les fenêtres ou lancer l'app au démarrage.
@@ -61,7 +62,7 @@ jobs:
           ### Note
           L'exécutable n'est pas signé : au premier lancement, SmartScreen peut afficher « Windows a protégé votre ordinateur ». Cliquez sur **Informations complémentaires → Exécuter quand même**.
 
-          Windows 10 / 11, 64 bits. Compilé automatiquement à partir du code de ce tag par GitHub Actions.
+          Windows 10 / 11, 64 bits. Compilé avec MSVC (Visual Studio) à partir du code de ce tag par GitHub Actions.
           NOTES
           printf '\nSHA-256 : `%s`\n' "$(sha256sum build/Epingle.exe | cut -d' ' -f1)" >> notes.md
           if gh release view "$TAG" >/dev/null 2>&1; then
