@@ -32,6 +32,13 @@ jobs:
             echo "::error::network library imported"; exit 1
           fi
 
+      - name: Show security features
+        shell: bash
+        run: |
+          ls -l build/Epingle.exe
+          dumpbin //nologo //headers build/Epingle.exe | grep -iE 'dynamic base|NX compatible|Guard|High Entropy|CET'
+          dumpbin //nologo //loadconfig build/Epingle.exe | grep -iE 'Dependent Load|Guard Flags|Security Cookie'
+
       - uses: actions/upload-artifact@v4
         with:
           name: Epingle
